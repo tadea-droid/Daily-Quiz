@@ -3,5 +3,5 @@ main = "src/index.js"
 compatibility_date = "2024-11-01"
 
 kv_namespaces = [
-  { binding = "QUIZ_KV", id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID" }
+  { binding = "QUIZ_KV", id = "d8fd0bf8fe0947ae995cec19ac9f01fd" }
 ]
