@@ -26,12 +26,26 @@ def extract_chunks():
     chunks = []
     for pdf_path in PDF_DIR.glob("*.pdf"):
         with pdfplumber.open(pdf_path) as pdf:
-            text = "\n".join(page.extract_text() or "" for page in pdf.pages)
-        paragraphs = re.split(r"\n\s*\n", text)
-        for para in paragraphs:
-            para = para.strip()
-            if MIN_CHUNK_CHARS <= len(para) <= MAX_CHUNK_CHARS:
-                chunks.append({"source": pdf_path.name, "text": para})
+            for page_num, page in enumerate(pdf.pages, start=1):
+                text = (page.extract_text() or "").strip()
+                if not text:
+                    continue
+                sentences = re.split(r"(?<=[.!?])\s+", text)
+                current = ""
+                for sentence in sentences:
+                    candidate = f"{current} {sentence}".strip() if current else sentence
+                    if len(candidate) <= MAX_CHUNK_CHARS:
+                        current = candidate
+                    else:
+                        if len(current) >= MIN_CHUNK_CHARS:
+                            chunks.append(
+                                {"source": f"{pdf_path.name} p.{page_num}", "text": current}
+                            )
+                        current = sentence
+                if len(current) >= MIN_CHUNK_CHARS:
+                    chunks.append(
+                        {"source": f"{pdf_path.name} p.{page_num}", "text": current}
+                    )
     return chunks
 
 
