@@ -73,7 +73,7 @@ def is_nsw_relevant(text):
 def build_prompt(chunk):
     return f"""You are writing a quiz question for a mechanical building services
 engineer in New South Wales, Australia, studying the National Construction
-Code (NCC) 2022 to progress from intermediate to senior level.
+Code (NCC) 2022.
 
 Passage (from {chunk['source']}):
 \"\"\"
@@ -83,6 +83,7 @@ Passage (from {chunk['source']}):
 Write one quiz question based on this passage, following these rules:
 - Test understanding of the underlying principle or requirement, not
   memorisation of clause numbers or exact wording.
+- Test what constitutes as the fundamentals of the NCC, that a building services engineer should know.
 - If the passage states a specific parameter that matters in practice (an
   airflow rate, temperature, pressure, clearance, rating, or similar figure),
   you may ask about that value, since figures like these matter for
