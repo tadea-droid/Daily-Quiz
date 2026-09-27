@@ -26,7 +26,7 @@
     padding: 24px 16px 48px;
   }
   h1 { font-size: 1.2rem; margin-bottom: 4px; }
-  #date { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+  #meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
   #question { font-size: 1.1rem; line-height: 1.5; margin-bottom: 20px; }
   textarea {
     width: 100%;
@@ -42,6 +42,7 @@
   }
   button {
     margin-top: 12px;
+    margin-right: 8px;
     padding: 10px 18px;
     font-size: 1rem;
     border: none;
@@ -50,50 +51,91 @@
     color: var(--bg);
     cursor: pointer;
   }
+  button.secondary {
+    background: transparent;
+    color: var(--fg);
+    border: 1px solid var(--border);
+  }
   button:disabled { opacity: 0.5; cursor: default; }
   #result { margin-top: 20px; padding: 14px; border-radius: 6px; display: none; }
   #result.correct { background: color-mix(in srgb, var(--correct) 15%, transparent); border: 1px solid var(--correct); }
   #result.incorrect { background: color-mix(in srgb, var(--incorrect) 15%, transparent); border: 1px solid var(--incorrect); }
   #result .verdict { font-weight: 600; margin-bottom: 6px; }
   #answer-line { margin-top: 8px; color: var(--muted); font-size: 0.9rem; }
+  #summary { display: none; margin-top: 20px; }
+  #summary .score { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
 </style>
 </head>
 <body>
 
 <h1>Daily Quiz</h1>
-<div id="date">Loading today's question...</div>
-<div id="question"></div>
+<div id="meta">Loading today's questions...</div>
 
-<textarea id="userAnswer" placeholder="Type your answer here"></textarea>
-<br>
-<button id="submitBtn">Check answer</button>
+<div id="quiz-area">
+  <div id="question"></div>
+  <textarea id="userAnswer" placeholder="Type your answer here"></textarea>
+  <br>
+  <button id="submitBtn">Check answer</button>
+</div>
 
 <div id="result"></div>
+
+<div id="summary">
+  <div class="score"></div>
+  <button id="moreBtn">Answer another question</button>
+</div>
 
 <script>
   // Set this to your deployed Cloudflare Worker URL, no trailing slash.
   const WORKER_URL = "https://daily-quiz-worker.tadea-dev.workers.dev";
 
-  const dateEl = document.getElementById("date");
+  const metaEl = document.getElementById("meta");
+  const quizAreaEl = document.getElementById("quiz-area");
   const questionEl = document.getElementById("question");
   const answerEl = document.getElementById("userAnswer");
   const submitBtn = document.getElementById("submitBtn");
   const resultEl = document.getElementById("result");
+  const summaryEl = document.getElementById("summary");
+  const scoreEl = summaryEl.querySelector(".score");
+  const moreBtn = document.getElementById("moreBtn");
+
+  let questions = [];
+  let currentIndex = 0;
+  let correctCount = 0;
+  let answeredCount = 0;
+
+  function showQuestion() {
+    resultEl.style.display = "none";
+    answerEl.value = "";
+    quizAreaEl.style.display = "block";
+    summaryEl.style.display = "none";
+
+    const q = questions[currentIndex];
+    metaEl.textContent = `Question ${currentIndex + 1} of ${questions.length}`;
+    questionEl.textContent = q.question;
+  }
+
+  function showSummary() {
+    quizAreaEl.style.display = "none";
+    summaryEl.style.display = "block";
+    scoreEl.textContent = `${correctCount} / ${answeredCount} correct`;
+  }
 
   async function loadToday() {
     try {
       const res = await fetch(`${WORKER_URL}/today`);
       const data = await res.json();
-      if (!data.question) {
-        dateEl.textContent = "No question set yet. Check back after the next run.";
-        submitBtn.disabled = true;
+      if (!data.questions || data.questions.length === 0) {
+        metaEl.textContent = "No questions set yet. Check back after the next run.";
+        quizAreaEl.style.display = "none";
         return;
       }
-      dateEl.textContent = data.date;
-      questionEl.textContent = data.question;
+      questions = data.questions;
+      currentIndex = 0;
+      showQuestion();
     } catch (err) {
-      dateEl.textContent = "Could not reach the quiz worker.";
-      submitBtn.disabled = true;
+      metaEl.textContent = "Could not reach the quiz worker.";
+      quizAreaEl.style.display = "none";
     }
   }
 
@@ -101,6 +143,7 @@
     const answer = answerEl.value.trim();
     if (!answer) return;
 
+    const q = questions[currentIndex];
     submitBtn.disabled = true;
     submitBtn.textContent = "Checking...";
 
@@ -108,9 +151,12 @@
       const res = await fetch(`${WORKER_URL}/grade`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answer }),
+        body: JSON.stringify({ id: q.id, answer }),
       });
       const data = await res.json();
+
+      answeredCount += 1;
+      if (data.correct) correctCount += 1;
 
       resultEl.style.display = "block";
       resultEl.className = data.correct ? "correct" : "incorrect";
@@ -118,7 +164,16 @@
         <div class="verdict">${data.correct ? "Correct." : "Not quite."}</div>
         <div>${data.feedback || ""}</div>
         <div id="answer-line">Correct answer: ${data.correctAnswer || "unavailable"}</div>
+        <button id="nextBtn" class="secondary">${currentIndex + 1 < questions.length ? "Next question" : "Finish"}</button>
       `;
+      document.getElementById("nextBtn").addEventListener("click", () => {
+        if (currentIndex + 1 < questions.length) {
+          currentIndex += 1;
+          showQuestion();
+        } else {
+          showSummary();
+        }
+      });
     } catch (err) {
       resultEl.style.display = "block";
       resultEl.className = "incorrect";
@@ -129,7 +184,29 @@
     }
   }
 
+  async function requestMore() {
+    moreBtn.disabled = true;
+    moreBtn.textContent = "Generating...";
+    try {
+      const res = await fetch(`${WORKER_URL}/more`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        moreBtn.textContent = data.error || "No more questions available";
+        return;
+      }
+      const data = await res.json();
+      questions.push({ id: data.id, question: data.question });
+      currentIndex = questions.length - 1;
+      showQuestion();
+    } catch (err) {
+      moreBtn.textContent = "Could not generate a question. Try again.";
+    } finally {
+      moreBtn.disabled = false;
+    }
+  }
+
   submitBtn.addEventListener("click", submitAnswer);
+  moreBtn.addEventListener("click", requestMore);
   loadToday();
 </script>
 
