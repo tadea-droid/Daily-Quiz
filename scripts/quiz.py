@@ -100,7 +100,7 @@ Reply with only JSON, no other text, in this exact shape:
 def generate_question(client, chunk):
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=300,
+        max_tokens=150,
         messages=[{"role": "user", "content": build_prompt(chunk)}],
     )
     text = response.content[0].text.strip()
