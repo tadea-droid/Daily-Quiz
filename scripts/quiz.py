@@ -83,7 +83,7 @@ Passage (from {chunk['source']}):
 Write one quiz question based on this passage, following these rules:
 - Test understanding of the underlying principle or requirement, not
   memorisation of clause numbers or exact wording.
-- Test what constitutes as the fundamentals of the NCC, that a building services engineer should know.
+- Test the core fundamentals of the source text.
 - If the passage states a specific parameter that matters in practice (an
   airflow rate, temperature, pressure, clearance, rating, or similar figure),
   you may ask about that value, since figures like these matter for
@@ -100,7 +100,7 @@ Reply with only JSON, no other text, in this exact shape:
 def generate_question(client, chunk):
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=150,
+        max_tokens=300,
         messages=[{"role": "user", "content": build_prompt(chunk)}],
     )
     text = response.content[0].text.strip()
